@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kegel-Anzeige</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fddc8b">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#fddc8b;--ink:#111;--line:#111;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
@@ -189,6 +193,7 @@ input:focus{background:rgba(255,255,255,.45)}
   skip.addEventListener("click",closeQuiz);
   btns[0].focus();
 })();
+if("serviceWorker" in navigator){window.addEventListener("load",function(){try{navigator.serviceWorker.register("sw.js");}catch(e){}});}
 </script>
 </body>
 </html>
