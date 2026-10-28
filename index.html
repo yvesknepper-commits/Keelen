@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kegel-Anzeige</title>
+<style>
+:root{--bg:#fddc8b;--ink:#111;--line:#111;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Arial,sans-serif}
+#board{height:100%;min-height:320px;display:grid;grid-template-columns:repeat(4,1fr) 2.2fr repeat(4,1fr);grid-template-rows:1.1fr repeat(9,1fr);border:2px solid var(--line);font-size:min(3.6vw,6.5vh)}
+#board>*{border:1px solid var(--line);margin:0;min-width:0;min-height:0}
+input{font:inherit;color:inherit;background:transparent;border:0;border-radius:0;width:100%;height:100%;text-align:center;padding:0;outline:none}
+input:focus{background:rgba(255,255,255,.45)}
+.name{grid-column:span 4;font-size:1.05em}
+.cell{position:relative}
+.diag{background:linear-gradient(to bottom right,transparent calc(50% - 1px),var(--line) calc(50% - 1px),var(--line) calc(50% + 1px),transparent calc(50% + 1px))}
+.diag input{position:absolute;font-size:.8em}
+.diag input.tl{left:3%;top:3%;width:50%;height:46%}
+.diag input.br{right:3%;bottom:3%;width:50%;height:46%}
+#board>.mid-res{display:flex;align-items:center;justify-content:center;white-space:nowrap;border-top:0;border-bottom:0;font-size:1.1em}
+#board>.mid-end{border-top:0}
+.quiz{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;overflow:auto;padding:16px;transition:opacity .4s}
+.quiz.out{opacity:0;pointer-events:none}
+.quiz-box{margin:auto;width:min(32em,100%);display:flex;flex-direction:column;gap:.6em;font-size:clamp(14px,min(3.2vw,5vh),24px)}
+.quiz-q{margin:0 0 .4em;font-weight:700;font-size:1.25em}
+.quiz-opt{font:inherit;text-align:left;background:transparent;border:2px solid var(--line);padding:.55em .8em;color:inherit;cursor:pointer}
+.quiz-opt:hover,.quiz-opt:focus-visible{background:rgba(255,255,255,.45);outline:none}
+.quiz-opt:disabled{opacity:.4;text-decoration:line-through;cursor:default}
+.quiz-box{position:relative}
+.stamp{position:absolute;left:50%;top:48%;width:100%;text-align:center;font-weight:800;line-height:1.15;padding:.35em .4em;border:.14em solid currentColor;border-radius:.25em;background:rgba(255,247,222,.78);opacity:0;pointer-events:none;transform:translate(-50%,-50%) rotate(-10deg);transition:opacity .4s}
+.stamp.bad{color:#b3261e;font-size:1.5em}
+.stamp.ok{color:#1b6e2d;font-size:2.3em}
+.stamp.show{opacity:1;animation:stampin .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes stampin{from{transform:translate(-50%,-50%) rotate(-10deg) scale(2.6);opacity:0}to{transform:translate(-50%,-50%) rotate(-10deg) scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.stamp.show{animation:none}}
+.quiz-skip{align-self:flex-start;font:inherit;font-size:.7em;background:transparent;border:0;text-decoration:underline;padding:0;color:inherit;cursor:pointer}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.quiz-box.shake{animation:shake .35s}
+@media (prefers-reduced-motion:reduce){.quiz-box.shake{animation:none}.quiz{transition:none}}
+.sum{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.15em}
+.mid{border-top:0;border-bottom:0}
+.mid-head{border-bottom:1px solid var(--line)}
+.mid-score{display:flex;align-items:center;justify-content:center;gap:.3em;border-top:0;border-bottom:0}
+.mid-score input{width:1.6em;height:auto;font-size:1.05em}
+.mid-end{position:relative;border-top:0;display:flex;align-items:center;justify-content:center}
+#menuBtn{font:inherit;font-size:.85em;background:transparent;border:0;color:inherit;padding:.3em .8em;cursor:pointer}
+#menuBtn:focus-visible,.pop button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.pop{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#fff7de;border:1px solid var(--line);display:none;flex-direction:column;min-width:min(90%,16em);z-index:5}
+.pop.open{display:flex}
+.pop button{font:inherit;font-size:.7em;background:transparent;border:0;border-bottom:1px solid var(--line);padding:.7em .6em;cursor:pointer;color:inherit;text-align:center}
+.pop button:last-child{border-bottom:0}
+.pop button.warn{background:#111;color:#fff7de}
+</style>
+</head>
+<body>
+<main id="board" aria-label="Kegel-Anzeige"></main>
+<script>
+(function(){
+  var ROWS=8, KEY="kegel-anzeige-v2";
+  function isDiag(r){return (r+1)%4===0;}
+  function blankRow(r){return isDiag(r)?["","","","","",""]:["","",""];}
+  function fmt(n){return (n%1?String(n).replace(".",","):String(n));}
+  var board=document.getElementById("board");
+  var state={names:["",""],match:["",""],pts:[[],[]]};
+  try{var s=JSON.parse(localStorage.getItem(KEY));if(s&&s.pts)state=s;}catch(e){}
+  for(var t=0;t<2;t++){for(var r=0;r<ROWS;r++){if(!state.pts[t][r]||state.pts[t][r].length!==blankRow(r).length)state.pts[t][r]=blankRow(r);}}
+
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function el(tag,cls,parent){var e=document.createElement(tag);if(cls)e.className=cls;if(parent)parent.appendChild(e);return e;}
+  function digits(v){return v.replace(/\D/g,"").slice(0,3);}
+
+  var sumEls=[[],[]], totalEls=[], inputs=[], midEls=[], sums=[[],[]];
+
+  function nameInput(t){
+    var h=el("div","name");
+    var i=el("input","",h);i.type="text";i.placeholder="Vereinsname";i.value=state.names[t];i.setAttribute("aria-label","Name Verein "+(t+1));
+    i.addEventListener("input",function(){state.names[t]=i.value;save();});
+    return h;
+  }
+  function score(t,r,c){
+    var diag=isDiag(r);
+    var d=el("div","cell"+(diag?" diag":""));
+    var idxs=diag?[c*2,c*2+1]:[c];
+    idxs.forEach(function(k,n){
+      var i=el("input",diag?(n===0?"tl":"br"):"",d);i.type="text";i.inputMode="numeric";i.setAttribute("aria-label","Verein "+(t+1)+", Zeile "+(r+1)+", Spalte "+(c+1)+(diag?(n===0?" oben":" unten"):""));
+      i.value=state.pts[t][r][k];
+      i.addEventListener("input",function(){i.value=digits(i.value);state.pts[t][r][k]=i.value;calc();save();});
+      inputs.push(i);
+    });
+    return d;
+  }
+  function block(t,frag,startCol){
+    // returns nothing; appends in row-major via placeholders (see build)
+  }
+
+  var cells=[];
+  // build row by row: header, rows, total
+  (function build(){
+    // header
+    board.appendChild(nameInput(0));
+    el("div","mid mid-head",board);
+    board.appendChild(nameInput(1));
+    for(var r=0;r<ROWS;r++){
+      for(var c=0;c<3;c++)board.appendChild(score(0,r,c));
+      var s0=el("div","sum",board);sumEls[0][r]=s0;
+      midEls[r]=el("div","mid-res",board);
+      for(var c2=0;c2<3;c2++)board.appendChild(score(1,r,c2));
+      var s1=el("div","sum",board);sumEls[1][r]=s1;
+    }
+    // total row
+    for(var k=0;k<3;k++)el("div","",board);
+    totalEls[0]=el("div","sum",board);
+    var end=el("div","mid-end",board);
+    var btn=el("button","",end);btn.id="menuBtn";btn.type="button";btn.textContent="Total";btn.setAttribute("aria-haspopup","true");
+    var pop=el("div","pop",end);
+    var b1=el("button","",pop);b1.type="button";b1.textContent="Punkte löschen";
+    var b2=el("button","",pop);b2.type="button";b2.textContent="Alles zurücksetzen";
+    var armed=null;
+    function disarm(){armed=null;b1.textContent="Punkte löschen";b2.textContent="Alles zurücksetzen";b1.classList.remove("warn");b2.classList.remove("warn");}
+    btn.addEventListener("click",function(){pop.classList.toggle("open");disarm();});
+    document.addEventListener("click",function(e){if(!end.contains(e.target)){pop.classList.remove("open");disarm();}});
+    function wipe(all){
+      state.pts=[[],[]];for(var t=0;t<2;t++)for(var r=0;r<ROWS;r++)state.pts[t][r]=blankRow(r);
+      if(all)state.names=["",""];
+      inputs.forEach(function(i){i.value="";});
+      var ni=board.querySelectorAll(".name input");if(all){ni[0].value="";ni[1].value="";}
+      calc();save();pop.classList.remove("open");disarm();
+    }
+    [[b1,false,"p"],[b2,true,"a"]].forEach(function(x){
+      x[0].addEventListener("click",function(){
+        if(armed===x[2]){wipe(x[1]);}
+        else{disarm();armed=x[2];x[0].textContent="Wirklich? Nochmal tippen";x[0].classList.add("warn");}
+      });
+    });
+    for(var q=0;q<3;q++)el("div","",board);
+    totalEls[1]=el("div","sum",board);
+  })();
+
+  function calc(){
+    for(var t=0;t<2;t++){
+      var total=0,any=false;
+      for(var r=0;r<ROWS;r++){
+        var row=state.pts[t][r],sum=0,has=false;
+        for(var c=0;c<row.length;c++){if(row[c]!==""){sum+=parseInt(row[c],10);has=true;}}
+        sumEls[t][r].textContent=has?sum:"";
+        sums[t][r]=row.every(function(v){return v!=="";})?sum:null;
+        if(has){total+=sum;any=true;}
+      }
+      totalEls[t].textContent=any?total:"";
+    }
+    var pa=0,pb=0;
+    for(var r2=0;r2<ROWS;r2++){
+      var x=sums[0][r2],y=sums[1][r2];
+      if(x!==null&&y!==null){
+        if(x>y)pa+=1;else if(y>x)pb+=1;else{pa+=0.5;pb+=0.5;}
+        midEls[r2].textContent=fmt(pa)+" - "+fmt(pb);
+      }else midEls[r2].textContent="";
+    }
+  }
+  calc();
+
+  // Quiz vor dem Start
+  var QS=[
+    {q:"Wei heescht de beschte Keeleclub aus Lëtzebuerg?",a:["KC Beim Jang","KC Muselfrënn","KC Wëntreng","KC Kuebendällchen"],c:0}
+  ];
+  var qz=QS[Math.floor(Math.random()*QS.length)];
+  var ov=el("div","quiz",document.body);
+  var box=el("div","quiz-box",ov);
+  el("p","quiz-q",box).textContent=qz.q;
+  var opts=qz.a.map(function(t,i){return {t:t,ok:i===qz.c};}).sort(function(){return Math.random()-0.5;});
+  var btns=opts.map(function(o){var b=el("button","quiz-opt",box);b.type="button";b.textContent=o.t;return b;});
+  var stamp=el("div","stamp",box);stamp.setAttribute("role","status");var stampTimer=null;
+  function showStamp(text,ok,ms){
+    clearTimeout(stampTimer);
+    stamp.className="stamp";void stamp.offsetWidth;
+    stamp.textContent=text;
+    stamp.className="stamp show "+(ok?"ok":"bad");
+    if(ms)stampTimer=setTimeout(function(){stamp.className="stamp";},ms);
+  }
+  var skip=el("button","quiz-skip",box);skip.type="button";skip.textContent="Überspringen";
+  function closeQuiz(){ov.classList.add("out");setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},500);}
+  btns.forEach(function(b,i){
+    b.addEventListener("click",function(){
+      if(opts[i].ok){showStamp("Richteg, gudd Kees",true,0);btns.forEach(function(x){x.disabled=true;});setTimeout(closeQuiz,2200);}
+      else{b.disabled=true;showStamp("Firwat wëlls du des App benotzen, du hues dach keng Anung vum Lëtzebuerger Keelesport",false,10000);}
+    });
+  });
+  skip.addEventListener("click",closeQuiz);
+  btns[0].focus();
+})();
+</script>
+</body>
+</html>
