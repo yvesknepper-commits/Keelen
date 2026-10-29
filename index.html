@@ -12,8 +12,8 @@
 :root{--bg:#fddc8b;--ink:#111;--line:#111;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Arial,sans-serif}
-#board{height:100%;min-height:320px;display:grid;grid-template-columns:repeat(4,1fr) 2.2fr repeat(4,1fr);grid-template-rows:1.1fr repeat(9,1fr);border:2px solid var(--line);font-size:min(3.6vw,6.5vh)}
-#board>*{border:1px solid var(--line);margin:0;min-width:0;min-height:0}
+.board{height:100%;min-height:320px;display:grid;grid-template-columns:repeat(4,1fr) 2.2fr repeat(4,1fr);grid-template-rows:1.1fr repeat(9,1fr);border:2px solid var(--line);font-size:min(3.6vw,6.5vh)}
+.board>*{border:1px solid var(--line);margin:0;min-width:0;min-height:0}
 input{font:inherit;color:inherit;background:transparent;border:0;border-radius:0;width:100%;height:100%;text-align:center;padding:0;outline:none}
 input:focus{background:rgba(255,255,255,.45)}
 .name{grid-column:span 4;font-size:1.05em}
@@ -22,8 +22,8 @@ input:focus{background:rgba(255,255,255,.45)}
 .diag input{position:absolute;font-size:.8em}
 .diag input.tl{left:3%;top:3%;width:50%;height:46%}
 .diag input.br{right:3%;bottom:3%;width:50%;height:46%}
-#board>.mid-res{display:flex;align-items:center;justify-content:center;white-space:nowrap;border-top:0;border-bottom:0;font-size:1.1em}
-#board>.mid-end{border-top:0}
+.board>.mid-res{display:flex;align-items:center;justify-content:center;white-space:nowrap;border-top:0;border-bottom:0;font-size:1.1em}
+.board>.mid-end{border-top:0}
 .quiz{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;overflow:auto;padding:16px;transition:opacity .4s}
 .quiz.out{opacity:0;pointer-events:none}
 .quiz-box{margin:auto;width:min(32em,100%);display:flex;flex-direction:column;gap:.6em;font-size:clamp(14px,min(3.2vw,5vh),24px)}
@@ -48,31 +48,68 @@ input:focus{background:rgba(255,255,255,.45)}
 .mid-score{display:flex;align-items:center;justify-content:center;gap:.3em;border-top:0;border-bottom:0}
 .mid-score input{width:1.6em;height:auto;font-size:1.05em}
 .mid-end{position:relative;border-top:0;display:flex;align-items:center;justify-content:center}
-#menuBtn{font:inherit;font-size:.85em;background:transparent;border:0;color:inherit;padding:.3em .8em;cursor:pointer}
-#menuBtn:focus-visible,.pop button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.menuBtn{font:inherit;font-size:.85em;background:transparent;border:0;color:inherit;padding:.3em .8em;cursor:pointer}
+.menuBtn:focus-visible,.pop button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .pop{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#fff7de;border:1px solid var(--line);display:none;flex-direction:column;min-width:min(90%,16em);z-index:5}
 .pop.open{display:flex}
 .pop button{font:inherit;font-size:.7em;background:transparent;border:0;border-bottom:1px solid var(--line);padding:.7em .6em;cursor:pointer;color:inherit;text-align:center}
 .pop button:last-child{border-bottom:0}
 .pop button.warn{background:#111;color:#fff7de}
+[hidden]{display:none!important}
+.home{height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto;gap:min(3vw,3vh);padding:min(3vw,3vh)}
+@media (orientation:portrait){.home{grid-template-columns:1fr;grid-template-rows:1fr 1fr auto}}
+.tile{font:inherit;font-size:min(7vw,11vh);font-weight:700;background:transparent;color:inherit;border:2px solid var(--line);cursor:pointer;padding:.5em}
+.tile:hover,.tile:focus-visible,.reset{grid-column:1/-1;font:inherit;font-size:min(3.4vw,5vh);background:transparent;color:inherit;border:2px solid var(--line);padding:.45em;cursor:pointer}
+.reset:hover,.reset:focus-visible{background:rgba(255,255,255,.45);outline:none}
+.reset.warn{background:#111;color:#fff7de}
+.meme{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);opacity:0;pointer-events:none;transition:opacity .25s}
+.meme.show{opacity:1;pointer-events:auto}
+.meme img{max-width:92%;max-height:92%;object-fit:contain;border:3px solid #fff7de}
+.meme-fb{margin:0;background:var(--bg);border:3px solid var(--line);padding:.6em 1em;font-size:min(10vw,16vh);font-weight:700;transform:rotate(-6deg)}
 </style>
 </head>
 <body>
-<main id="board" aria-label="Kegel-Anzeige"></main>
+<nav id="home" class="home" hidden aria-label="Startseite">
+  <button type="button" class="tile" data-go="board">Championnat</button>
+  <button type="button" class="tile" data-go="coupe">Coupe</button>
+  <button type="button" class="reset" id="resetAll">Alles zurücksetzen</button>
+</nav>
+<main id="board" class="board" aria-label="Championnat-Anzeige" hidden></main>
+<main id="coupe" class="board" aria-label="Coupe-Anzeige" hidden></main>
 <script>
 (function(){
-  var ROWS=8, KEY="kegel-anzeige-v2";
+  var ROWS=8;
+  function el(tag,cls,parent){var e=document.createElement(tag);if(cls)e.className=cls;if(parent)parent.appendChild(e);return e;}
+  function digits(v){return v.replace(/\D/g,"").slice(0,3);}
+
+  // Meme: erscheint 5 Sekunden, wenn in einer Schrägstrich-Zelle eine Zahl unter 9 steht
+  var memeEl=null,memeHide=null,memeTimer=null,memeImg=null,memeFb=null,imgOk=true;
+  function ensureMeme(){
+    if(memeEl)return;
+    memeEl=el("div","meme",document.body);
+    memeImg=el("img","",memeEl);memeImg.alt="";memeImg.src="meme.jpg";
+    memeFb=el("p","meme-fb",memeEl);memeFb.textContent="Wat war dat?!";memeFb.hidden=true;
+    memeImg.addEventListener("error",function(){imgOk=false;});
+    memeEl.addEventListener("click",hideMeme);
+  }
+  function showMeme(){ensureMeme();var pic=imgOk&&Math.random()<0.5;memeImg.hidden=!pic;memeFb.hidden=pic;clearTimeout(memeHide);memeEl.classList.add("show");memeHide=setTimeout(hideMeme,5000);}
+  function hideMeme(){clearTimeout(memeHide);if(memeEl)memeEl.classList.remove("show");}
+  function memeCheck(i){
+    clearTimeout(memeTimer);
+    if(i.value==="")return;
+    memeTimer=setTimeout(function(){if(i.value!==""&&parseInt(i.value,10)<9)showMeme();},700);
+  }
+  ensureMeme();
   function isDiag(r){return (r+1)%4===0;}
   function blankRow(r){return isDiag(r)?["","","","","",""]:["","",""];}
   function fmt(n){return (n%1?String(n).replace(".",","):String(n));}
-  var board=document.getElementById("board");
+  function makeBoard(board,KEY,mode){
+  var wipeFn=function(){};
   var state={names:["",""],match:["",""],pts:[[],[]]};
   try{var s=JSON.parse(localStorage.getItem(KEY));if(s&&s.pts)state=s;}catch(e){}
   for(var t=0;t<2;t++){for(var r=0;r<ROWS;r++){if(!state.pts[t][r]||state.pts[t][r].length!==blankRow(r).length)state.pts[t][r]=blankRow(r);}}
 
   function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
-  function el(tag,cls,parent){var e=document.createElement(tag);if(cls)e.className=cls;if(parent)parent.appendChild(e);return e;}
-  function digits(v){return v.replace(/\D/g,"").slice(0,3);}
 
   var sumEls=[[],[]], totalEls=[], inputs=[], midEls=[], sums=[[],[]];
 
@@ -89,7 +126,7 @@ input:focus{background:rgba(255,255,255,.45)}
     idxs.forEach(function(k,n){
       var i=el("input",diag?(n===0?"tl":"br"):"",d);i.type="text";i.inputMode="numeric";i.setAttribute("aria-label","Verein "+(t+1)+", Zeile "+(r+1)+", Spalte "+(c+1)+(diag?(n===0?" oben":" unten"):""));
       i.value=state.pts[t][r][k];
-      i.addEventListener("input",function(){i.value=digits(i.value);state.pts[t][r][k]=i.value;calc();save();});
+      i.addEventListener("input",function(){i.value=digits(i.value);state.pts[t][r][k]=i.value;calc();save();if(diag)memeCheck(i);});
       inputs.push(i);
     });
     return d;
@@ -116,10 +153,12 @@ input:focus{background:rgba(255,255,255,.45)}
     for(var k=0;k<3;k++)el("div","",board);
     totalEls[0]=el("div","sum",board);
     var end=el("div","mid-end",board);
-    var btn=el("button","",end);btn.id="menuBtn";btn.type="button";btn.textContent="Total";btn.setAttribute("aria-haspopup","true");
+    var btn=el("button","",end);btn.className="menuBtn";btn.type="button";btn.textContent="Total";btn.setAttribute("aria-haspopup","true");
     var pop=el("div","pop",end);
     var b1=el("button","",pop);b1.type="button";b1.textContent="Punkte löschen";
     var b2=el("button","",pop);b2.type="button";b2.textContent="Alles zurücksetzen";
+    var b3=el("button","",pop);b3.type="button";b3.textContent="Zur Startseite";
+    b3.addEventListener("click",function(){pop.classList.remove("open");showView("home");});
     var armed=null;
     function disarm(){armed=null;b1.textContent="Punkte löschen";b2.textContent="Alles zurücksetzen";b1.classList.remove("warn");b2.classList.remove("warn");}
     btn.addEventListener("click",function(){pop.classList.toggle("open");disarm();});
@@ -131,6 +170,7 @@ input:focus{background:rgba(255,255,255,.45)}
       var ni=board.querySelectorAll(".name input");if(all){ni[0].value="";ni[1].value="";}
       calc();save();pop.classList.remove("open");disarm();
     }
+    wipeFn=wipe;
     [[b1,false,"p"],[b2,true,"a"]].forEach(function(x){
       x[0].addEventListener("click",function(){
         if(armed===x[2]){wipe(x[1]);}
@@ -153,16 +193,45 @@ input:focus{background:rgba(255,255,255,.45)}
       }
       totalEls[t].textContent=any?total:"";
     }
-    var pa=0,pb=0;
+    var pa=0,pb=0,cum=0;
     for(var r2=0;r2<ROWS;r2++){
       var x=sums[0][r2],y=sums[1][r2];
       if(x!==null&&y!==null){
-        if(x>y)pa+=1;else if(y>x)pb+=1;else{pa+=0.5;pb+=0.5;}
-        midEls[r2].textContent=fmt(pa)+" - "+fmt(pb);
+        if(mode==="coupe"){
+          cum+=x-y;var dd=cum;
+          midEls[r2].textContent=dd>0?"+ "+dd+" -":(dd<0?"- "+(-dd)+" +":"0");
+        }else{
+          if(x>y)pa+=1;else if(y>x)pb+=1;else{pa+=0.5;pb+=0.5;}
+          midEls[r2].textContent=fmt(pa)+" - "+fmt(pb);
+        }
       }else midEls[r2].textContent="";
     }
   }
   calc();
+  return {reset:function(){wipeFn(true);}};
+  }
+  var boards=[
+    makeBoard(document.getElementById("board"),"kegel-anzeige-v2","champ"),
+    makeBoard(document.getElementById("coupe"),"kegel-coupe-v1","coupe")
+  ];
+
+  // Alles zurücksetzen (Startseite)
+  var rb=document.getElementById("resetAll"),rt=null;
+  function disarmReset(){clearTimeout(rt);rb.classList.remove("warn");rb.textContent="Alles zurücksetzen";}
+  rb.addEventListener("click",function(){
+    if(rb.classList.contains("warn")){
+      boards.forEach(function(b){b.reset();});
+      disarmReset();rb.textContent="Alles zurückgesetzt";rt=setTimeout(disarmReset,2000);
+    }else{
+      rb.classList.add("warn");rb.textContent="Wirklich alles löschen? Nochmal tippen";rt=setTimeout(disarmReset,5000);
+    }
+  });
+
+  // Ansichten: Startseite, Coupe, Championnat
+  function showView(n){["home","coupe","board"].forEach(function(id){document.getElementById(id).hidden=(id!==n);});}
+  Array.prototype.forEach.call(document.querySelectorAll("[data-go]"),function(b){
+    b.addEventListener("click",function(){showView(b.getAttribute("data-go"));});
+  });
 
   // Quiz vor dem Start
   var QS=[
@@ -183,7 +252,7 @@ input:focus{background:rgba(255,255,255,.45)}
     if(ms)stampTimer=setTimeout(function(){stamp.className="stamp";},ms);
   }
   var skip=el("button","quiz-skip",box);skip.type="button";skip.textContent="Überspringen";
-  function closeQuiz(){ov.classList.add("out");setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},500);}
+  function closeQuiz(){showView("home");ov.classList.add("out");setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov);},500);}
   btns.forEach(function(b,i){
     b.addEventListener("click",function(){
       if(opts[i].ok){showStamp("Richteg, gudd Kees",true,0);btns.forEach(function(x){x.disabled=true;});setTimeout(closeQuiz,2200);}
